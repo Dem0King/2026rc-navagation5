@@ -1,0 +1,57 @@
+<launch>
+
+  <include file="$(find velocity_smoother_ema)/launch/velocity_smoother_ema.launch" />
+
+  <!-- 全局定位：可用 AMCL 或 FAST-LIO-Localization -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base1" output="screen" clear_params="true" args="/map:=prior_map /odom:=Odometry">
+        <remap from="cmd_vel" to="/raw_cmd_vel"/>
+        <rosparam file="$(find ladio_nav)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(find ladio_nav)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+        <rosparam file="$(find ladio_nav)/param/local_costmap_params.yaml" command="load" />
+        <rosparam file="$(find ladio_nav)/param/global_costmap_params.yaml" command="load" />
+        <rosparam file="$(find ladio_nav)/param/teb_local_planner_params.yaml" command="load" />
+        <rosparam file="$(find ladio_nav)/param/global_planner_params.yaml" command="load" />
+
+
+    <!-- 指定规划器 -->
+    <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
+    <param name="base_local_planner"  value="teb_local_planner/TebLocalPlannerROS"/>
+    <param name="controller_frequency" value="8.0"/>
+    <!-- 8 -->
+	<param name="transform_tolerance" value="1.0"/>
+
+
+
+  </node>
+
+  <node name="trans_tf_2d" pkg="ladio_nav" type="trans_tf_2d" output="screen"/>
+
+  <node name="visual_box_align" pkg="ladio_nav" type="visual_box_align.py" output="screen">
+    <param name="track_topic" value="/yolo_depth/track_control"/>
+    <param name="cmd_topic" value="/raw_cmd_vel"/>
+    <param name="target_x" value="0.31"/>
+    <param name="target_y" value="0.017"/>
+    <param name="x_tolerance" value="0.02"/>
+    <param name="y_tolerance" value="0.02"/>
+    <param name="settle_frames" value="6"/>
+    <param name="settle_time" value="0.5"/>
+    <param name="timeout" value="12.0"/>
+    <param name="control_rate" value="15.0"/>
+    <param name="kp_x" value="0.35"/>
+    <param name="min_vx" value="0.035"/>
+    <param name="max_vx" value="0.10"/>
+    <param name="kp_yaw" value="1.2"/>
+    <param name="min_wz" value="0.08"/>
+    <param name="max_wz" value="0.25"/>
+    <param name="yaw_sign" value="-1.0"/>
+    <param name="check_class" value="false"/>
+    <param name="y_abs_limit" value="0.0"/>
+    <param name="post_stop_sleep" value="0.25"/>
+  </node>
+
+
+  <!-- <node pkg="ladio_nav" type="trans_tf_2d" name="trans_tF_2d" /> -->
+
+
+
+</launch>

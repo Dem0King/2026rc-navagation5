@@ -1,0 +1,20 @@
+# 编译产物
+build/
+devel/
+install/
+log/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+
+# 编辑器
+.vscode/
+.idea/
+
+# 备份文件
+*.bak
+
+# 大文件（按需删改）
+*.bag

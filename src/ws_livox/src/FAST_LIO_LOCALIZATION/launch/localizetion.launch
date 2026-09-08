@@ -1,0 +1,70 @@
+<launch>
+
+  <!-- ============================================================
+       该 launch 文件包含完整的 FAST-LIO 定位功能：
+         1. FAST-LIO 前端（激光里程计）
+         2. 全局定位（map→camera_init 配准）
+         3. 位姿融合发布 /localization
+         4. 地图发布、2D 栅格地图、点云转激光
+         5. TF 树静态变换
+       ============================================================ -->
+
+  <!-- ===================== 可调参数 =========================== -->
+  <arg name="rviz" default="true" />
+  <arg name="use_sim_time" value="true"/>
+  <arg name="map" default="$(find fast_lio)/PCD/scans.pcd" />
+
+  <!-- ===================== FAST-LIO 核心 ====================== -->
+  <!-- 加载雷达参数（MID360 内外参） -->
+  <rosparam command="load" file="$(find fast_lio_localization)/config/mid360.yaml" />
+  <param name="feature_extract_enable" type="bool" value="0"/>
+  <param name="point_filter_num" type="int" value="5"/>     <!-- 抽稀：每5个点取1个，降低CPU负载 -->
+  <param name="max_iteration" type="int" value="3" />       <!-- 迭代次数 -->
+  <param name="filter_size_surf" type="double" value="0.5" />
+  <param name="filter_size_map" type="double" value="0.5" />
+  <param name="cube_side_length" type="double" value="1000" />
+  <param name="runtime_pos_log_enable" type="bool" value="0" />
+  <param name= "pcd_save_en" type="bool" value="false"/>
+  <!-- FAST-LIO 核心节点：接收雷达点云，输出 /Odometry 和 TF camera_init→body -->
+  <node pkg="fast_lio" type="fastlio_mapping" name="laserMapping" output="screen" />
+
+  <!-- ===================== 全局定位 ========================== -->
+  <!-- 基于先验 PCD 地图的全局定位，发布 /map_to_odom（map→camera_init 配准结果） -->
+  <node pkg="fast_lio_localization" type="global_localization.py" name="global_localization" output="screen" />
+
+  <!-- 位姿融合：订阅 /Odometry + /map_to_odom → 发布 /localization + 发布 TF camera_init→map -->
+  <node pkg="fast_lio_localization" type="transform_fusion.py" name="transform_fusion" output="screen" />
+
+  <!-- ===================== 地图可视化 ======================== -->
+  <!-- 将先验 PCD 点云地图发布到 /map 话题（方便 RViz 查看） -->
+  <node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publishe" output="screen"
+        args="$(arg map) 5 _frame_id:=map cloud_pcd:=map" />
+
+  <!-- 调试 RViz（if） -->
+  <group if="$(arg rviz)">
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz"
+          args="-d $(find fast_lio_localization)/rviz_cfg/localization.rviz" />
+  </group>
+
+  <!-- ===================== 2D 导航支持 ======================= -->
+  <!-- 加载预建的 2D 占用栅格地图（map_server 发布到 /prior_map） -->
+  <arg name="2dmap" default="scans.yaml" />
+  <node name="map_server" pkg="map_server" type="map_server"
+        args="$(find fast_lio)/PCD/scans.yaml /map:=prior_map" />
+
+  <!-- 将 FAST-LIO 的 /cloud_registered（3D 点云）转为 /scan（2D 激光数据），
+       供 move_base 的代价地图做障碍物检测 -->
+  <include file="$(find fast_lio_localization)/launch/PointsCloud2toLaserscan.launch">
+  </include>
+  <!-- ===================== TF 静态变换 ======================= -->
+  <!-- 雷达→机器人中心偏移：LiDAR 装在狗尾，狗长 700mm，中心在 LiDAR 前方 0.35m，宽度居中 -->
+  <!-- z=-0.30 表示 LiDAR 离地约 30cm（根据实际安装高度调整） -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="tf_pub_1"
+        args="0.15 0 -0.30 0 0 0 body body_foot" />
+  <!-- 定位初始偏移：camera_init → robot_foot_init（建图起点时的足端位置）0.35 0 -0.30 -->
+  <node pkg="tf2_ros" type="static_transform_publisher" name="tf_pub_2"
+        args="0.15 0 -0.30 0 0 0 camera_init robot_foot_init" />
+	<!-- 发布一个雷达初始位置camera_init到map的静态映射 -->
+  <!-- <node pkg="tf2_ros" type="static_transform_publisher" name="tf_pub_3" args="0 0 0 0 0 0 map camera_init" /> -->
+
+</launch>

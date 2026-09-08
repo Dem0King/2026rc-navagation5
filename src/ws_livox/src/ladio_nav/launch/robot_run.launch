@@ -1,0 +1,32 @@
+<launch>
+
+  <!-- rviz 开关：true=打开导航调试窗口，false=不打开（省CPU） -->
+  <arg name="rviz" default="true" />
+
+  <!-- 雷-达驱动 -->
+  <include file="$(find livox_ros_driver2)/launch_ROS1/msg_MID360.launch">
+  </include>
+
+  <!-- FAST-LIO 定位（传 rviz 参数，关闭自带的 localization RViz，统一走后门的导航 RViz） -->
+  <include file="$(find fast_lio_localization)/launch/localizetion.launch">
+    <arg name="rviz" value="false" />
+  </include>
+
+  <!-- 发布初始位姿（如果建图时的起点和当前起点一致，后续不需要每次运行都重定位） -->
+  <node pkg="fast_lio_localization" type="publish_initial_pose.py" name="publish_initial_pose" output="screen"
+        args="0 0 0 0 0 0" />
+
+  <!-- 路径规划（move_base + TEB） -->
+  <include file="$(find ladio_nav)/launch/move_base.launch">
+  </include>
+
+  <!-- 串口桥接：发布 cmd_vel + localization → STM32 -->
+  <node pkg="ladio_nav" type="serial_bridge.py" name="serial_bridge" output="screen" />
+
+  <!-- 导航调试 RViz（if rviz） -->
+  <!-- <group if="$(arg rviz)">
+    <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz_nav"
+          args="-d $(find my_nav)/rviz_cfg/nav_debug.rviz" />
+  </group> -->
+
+</launch>

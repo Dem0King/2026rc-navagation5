@@ -1,0 +1,5 @@
+alpha_v: 0.6 # 0.2 by default 0.3
+alpha_w: 0.65 # 0.2 by default 0.45
+raw_cmd_topic: "raw_cmd_vel" # raw_cmd_vel by default
+cmd_topic: "cmd_vel" # cmd_vel by default
+cmd_rate: 30.0 # 30.0 Hz by default

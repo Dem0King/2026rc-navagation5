@@ -1,0 +1,82 @@
+# =============================================================================
+# TEB 局部规划器完整参数（teb_local_planner_params.yaml）
+# 适用于差速/全向四足底盘，Mid-360 激光雷达
+# =============================================================================
+TebLocalPlannerROS:
+  odom_topic: Odometry
+  holonomic_robot: false # false
+  # ==========================
+  # 1. 公共参数（原 DWA 数值，完全沿用）
+  # ==========================
+  max_vel_x: 0.52 # 1.0              # 最大线速度 x (m/s) 0.7 → 降速防终点过冲 0.4
+  min_vel_x: -0.4 # -1.0             # 最小线速度 x (m/s) -0.55 → 微调不倒车过猛 -0.3
+  max_vel_y: 0.0 # 1.0 0.4              # 最大线速度 y (m/s，全向轮/麦克纳姆轮有效)
+  min_vel_y: 0.0 # -1.0 -0.35           # 最小线速度 y (m/s)
+  max_vel_theta: 0.9         # 最大角速度 (rad/s) 1.5 → 降速防终点过冲 0.6 0.8
+  min_vel_theta: -0.9 # -1.0         # 最小角速度 (rad/s) -0.8
+  acc_lim_x: 1.2             # x 方向最大加速度 (m/s²) 5.0 → 平缓减速防过冲 1.5
+  acc_lim_y: 0.0             # y 方向最大加速度 (m/s²) 10.0 
+  acc_lim_theta: 0.6          # 1.0 → 平缓角减速防过冲  0.5
+  xy_goal_tolerance: 0.15      # 目标 XY 容差 (m) 0.02 → 5cm 防终点振荡 0.15
+  yaw_goal_tolerance: 0.10    # 目标角度容差 (rad) 0.05 → ~6° 防终点振荡 0.10
+  sim_time: 2.0               # 前向仿真时间窗口 (s) 2.0 1.8 
+  vx_samples: 20              # x 线速度采样点数量
+  vy_samples: 1              # y 线速度采样点数量 15
+  vth_samples: 20             # 角速度采样点数量 15
+  sim_granularity: 0.03       # 轨迹离散化粒度 (m)
+  oscillation_reset_dist: 0.15 # 判定为”脱离震荡”的最小位移 (m) 0.07 → > xy_goal_tolerance
+
+  # ==========================
+  # 2. TEB 独有参数（默认值，按需微调）
+  # ==========================
+  dt_ref: 0.4                 # 轨迹离散化时间步长 (s) 0.3
+  dt_hysteresis: 0.25          # 步长容差 (s) 0.1 → 抗 odom 抖动防频繁重规划 0.2
+  min_turning_radius: 0.0     # 最小转弯半径 (m；差分/全向轮设 0)
+  max_global_plan_lookahead_dist: 2.5  # 局部规划向前看多远 (m) 2.0 1.5
+  feasibility_check_no_poses: 5        # 轨迹可行性检查的位姿步数
+  min_obstacle_dist: 0.01     # 与障碍最小距离 (m) 0.05 → 关闭避障
+  inflation_dist: 0.01         # 额外膨胀距离 (m) 0.15 → 关闭避障
+  include_costmap_obstacles: false      # 不参考代价地图障碍 → 关闭避障
+  costmap_obstacles_behind_robot_dist: 1.0  # 身后多少米内仍考虑障碍 (m)
+
+  # 优化权重（一般保持默认即可）
+  weight_max_vel_x: 2.0
+  weight_max_vel_theta: 1.0 # 1.0
+  weight_acc_lim_x: 1.0
+  weight_acc_lim_theta: 1.0
+  weight_kinematics_nh: 1000.0 # 全向机器人不需要这个约束改成0.0 # 1000.0 # 非完整性约束权重（差分驱动高值）
+  weight_kinematics_forward_drive: 50.0 # 1.0 → 倒车成本极高，强制原地转向+直走 100
+  weight_obstacle: 0.0 # 5 0.0 → 关闭避障
+  weight_optimaltime: 0.5 # 1.0
+  
+  # ==========================
+  # 3. 自定义参数（差速模式）
+  # ==========================
+  # 不强制覆盖朝向，让 TEB 自由规划（设为 true 会与狗当前朝向冲突 → U 型弯）
+  global_plan_overwrite_orientation: false
+  # 途经点间距 0.5m：给 TEB 参考方向但不卡死位置
+  # global_plan_viapoint_sep: 0.5
+  # 明确告知 TEB：零转弯半径不受惩罚，放心原地转
+  weight_kinematics_turning_radius: 0.0
+  # 禁止初始化倒车轨迹
+  # allow_init_with_backwards_motion: false
+  # 终点强制速度归零，不允许自由滑行过目标
+  h_sign: 2
+  # 显式声明：抵达目标时速度必须为零（配合 h_sign: 2）
+  free_goal_vel: false
+  # 一旦进入 XY 容差范围，锁定位置不再微调（只修朝向）→ 彻底消灭终点振荡
+  latch_xy_goal_tolerance: true
+  # 没有它，TEB 在遇到 vx=0 的原地转圈时，欧几里得距离公式会算错，导致狗在原地一直单向转圈找不到北。
+  exact_arc_length: true
+
+  # 机器人 footprint 模型（与 costmap_common_params.yaml 保持一致）
+  # 狗体尺寸: 长 700mm × 宽 500mm, 半长 0.35m, 半宽 0.25m
+  footprint_model:
+    type: "polygon"
+    vertices: [[-0.35, -0.25], [-0.35, 0.25], [0.35, 0.25], [0.35, -0.25]]
+
+  # 可视化 / 调试
+  publish_traj_pc: true         # 发布轨迹点云
+  publish_cost_grid_pc: true    # 发布代价网格点云
+  global_frame_id: map  # 全局坐标系
+  # global_frame_id: camera_init  # 全局坐标系
